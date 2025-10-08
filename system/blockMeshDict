@@ -1,0 +1,86 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  5                                     |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+xmin  -0.152;
+xmax  0.03;
+ymin  0.03;
+ymax  0.15;
+zmin  -0.138;
+zmax  0.01;
+
+deltax 0.001;
+deltay 0.001;
+deltaz 0.001;
+
+lx #calc "$xmax - $xmin";
+ly #calc "$ymax - $ymin";
+lz #calc "$zmax - $zmin";
+
+xcells #calc "round($lx/$deltax)";
+ycells #calc "round($ly/$deltay)";
+zcells #calc "round($lz/$deltaz)";
+
+
+vertices
+(
+    ($xmin $ymin $zmin)
+    ($xmax $ymin $zmin)
+    ($xmax $ymax $zmin)
+    ($xmin $ymax $zmin)
+    ($xmin $ymin $zmax)
+    ($xmax $ymin $zmax)
+    ($xmax $ymax $zmax)
+    ($xmin $ymax $zmax)
+);
+
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) ($xcells $ycells $zcells) simpleGrading (1 1 1)	//AP: it gives 0.4-mm-length cells as the baseline net
+);
+
+boundary
+(
+    a
+    {
+        type patch;
+        faces
+        (
+            (0 3 2 1)
+        );
+    }
+    b
+    {
+        type patch;
+        faces
+        (
+            (4 5 6 7)
+        );
+    }
+    c
+    {
+        type wall;
+        faces
+        (
+            (0 4 7 3)
+            (2 6 5 1)
+            (1 5 4 0)
+            (3 7 6 2)
+        );
+    }
+);
+
+
+// ************************************************************************* //
+

@@ -1,0 +1,188 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2306                                  |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    arch        "LSB;label=32;scalar=64";
+    class       volVectorField;
+    location    "0";
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    artery
+    {
+        type            noSlip;
+    }
+    inlet
+    {
+        type            codedFixedValue;
+        value           uniform (0 0 0);
+        name            parabolicFlowRateInlet_exactQ_projected_normal;
+        code            #{
+        const fvPatch& p = patch();
+        const label nF = p.size();
+
+        const vectorField& Cf = p.Cf();
+        const vectorField& Sf = p.Sf();
+        const scalarField  magSf = mag(Sf);
+
+        // Patch center, area, mean normal
+        const scalar A = gSum(magSf);
+        const vector C = gSum(Cf*magSf) / max(A, SMALL);
+        vector nMean = gSum(Sf); nMean /= (mag(nMean) + SMALL);
+
+        // in-plane radius per face
+        scalarField r(nF, 0.0);
+        forAll(Cf, i)
+        {
+            const vector d = Cf[i] - C;
+            const vector dTan = d - ((d & nMean)*nMean);
+            r[i] = mag(dTan);
+        }
+        const scalar R = sqrt( max(A, SMALL) / constant::mathematical::pi );
+
+        // Q(t) from constant/flowrate
+        const scalar t = this->db().time().value();
+        List<Tuple2<scalar, scalar>> Qtab;
+        Switch repeat(false);
+        scalar rampTime = 0.05;
+
+        {
+            IOdictionary Qdict
+            (
+                IOobject
+                (
+                    "flowrate",
+                    this->db().time().constant(),
+                    this->db(),
+                    IOobject::MUST_READ,
+                    IOobject::NO_WRITE
+                )
+            );
+            Qdict.readIfPresent("repeat", repeat);
+            Qdict.readIfPresent("rampTime", rampTime);
+            Qtab = Qdict.lookup("values");
+        }
+
+        if (Qtab.size() == 0)
+        {
+            FatalErrorInFunction << "Flow-rate table is empty." << exit(FatalError);
+        }
+
+        const scalar t0 = Qtab.first().first();
+        const scalar t1 = Qtab.last().first();
+        const scalar period = max(t1 - t0, SMALL);
+
+        // Effective time for table lookup (may wrap if repeat=yes)
+        scalar tEff = t;
+        if (repeat && Qtab.size() > 1)
+        {
+            const scalar s = max(t - t0, 0.0);
+            tEff = t0 + ::fmod(s, period);
+        }
+
+        // Interpolate Q at tEff
+        scalar Q = 0.0;
+        if (!repeat)
+        {
+            if (tEff <= t0)      Q = Qtab.first().second();
+            else if (tEff >= t1) Q = Qtab.last().second();
+        }
+        if (repeat || (tEff > t0 && tEff < t1))
+        {
+            for (label i = 1; i < Qtab.size(); ++i)
+            {
+                const scalar ta = Qtab[i-1].first();
+                const scalar tb = Qtab[i].first();
+                if (tEff >= ta && tEff < tb)
+                {
+                    const scalar qa = Qtab[i-1].second();
+                    const scalar qb = Qtab[i].second();
+                    const scalar a = (tEff - ta)/max(tb - ta, SMALL);
+                    Q = (1.0 - a)*qa + a*qb;
+                    break;
+                }
+            }
+            if (mag(tEff - t1) <= SMALL)
+            {
+                Q = repeat ? Qtab.first().second() : Qtab.last().second();
+            }
+        }
+
+        // ---- One-time ramp tied to the table start (no re-ramp on repeats) ----
+        scalar ramp = 1.0;
+        if (rampTime > SMALL)
+        {
+            // "s0" advances monotonically from the table start t0, without modulo
+            const scalar s0 = max(t - t0, 0.0);
+            ramp = (s0 < rampTime) ? (s0/max(rampTime, SMALL)) : 1.0;
+        }
+        const scalar Qr = ramp * Q;
+        // ----------------------------------------------------------------------
+
+        // Parabolic shape
+        scalarField uiShape(nF, 0.0);
+        forAll(uiShape, i)
+        {
+            const scalar ri = min(r[i]/max(R, SMALL), 1.0);
+            uiShape[i] = max(1.0 - sqr(ri), 0.0);
+        }
+
+        // Projected-area scaling (exact-Q)
+        const scalarField proj = Sf & nMean;
+        const scalar sumShape  = gSum( uiShape * proj );
+        if (mag(sumShape) <= SMALL)
+        {
+            FatalErrorInFunction
+                << "sumShape too small/negative. Patch orientation/quality issue."
+                << exit(FatalError);
+        }
+
+        const scalar scale = Qr / sumShape;  // Q>0 => inflow into domain
+        vectorField& U = *this;
+        forAll(U, i) { U[i] = -scale * uiShape[i] * nMean; }
+    #};
+    }
+        outlet
+    {
+    type            stabilizedWindkesselVelocity;
+kappa           8;          // 5–8 is a sweet spot
+Uref            0;
+linearDamping   false;      // keep nonlinear at the aorta
+alphaMax        0.8;        // fine here
+stateAware      true;
+CoRef           0.5;
+wkTau           0.71;          // or 0.05–0.10 s if desired
+tauRef          0.2;
+
+    
+    }
+    
+    // --- Coronary outlets: allow reversal (no velocity clamp) ---
+Lc1         { type pressureInletOutletVelocity; value uniform (0 0 0); }
+Lc1_sub1    { type pressureInletOutletVelocity; value uniform (0 0 0); }
+Lc1_sub2    { type pressureInletOutletVelocity; value uniform (0 0 0); }
+Lc1_sub3    { type pressureInletOutletVelocity; value uniform (0 0 0); }
+Lc2         { type pressureInletOutletVelocity; value uniform (0 0 0); }
+Lc2_sub1    { type pressureInletOutletVelocity; value uniform (0 0 0); }
+Rc1         { type pressureInletOutletVelocity; value uniform (0 0 0); }
+Rc1_sub1    { type pressureInletOutletVelocity; value uniform (0 0 0); }
+Rc1_sub2    { type pressureInletOutletVelocity; value uniform (0 0 0); }
+
+}
+
+
+// ************************************************************************* //

@@ -1,0 +1,199 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 | OpenFOAM v2306 (OpenCFD)                       |
+| \\      /  F ield         | Kinematic pressure p                           |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    location    "0";
+    object      p;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 2 -2 0 0 0 0];
+
+internalField   uniform 0;
+
+boundaryField
+{
+    artery
+    {
+        type            zeroGradient;
+    }
+    inlet
+    {
+        type            zeroGradient;
+    }
+    outlet
+    {
+        type            windkesselOutletPressure;
+        Rd              1415.2e+05;
+        Pd              0;
+        rho             1060;
+        windkesselModel WK3;
+        Rp              139.97e+05;
+        C               1.0e-08;
+        diffScheme      firstOrder;
+        relaxFactor     0.5;
+        useLaggedFlux   true;
+        flipFluxSign    false;
+        value           uniform 0;
+    }
+
+    Lc1
+    {
+        type            coronaryOutletPressure;
+
+        Ra              10179200000;        // Pa·s/m^3
+        Ram             16541200000;        // Pa·s/m^3
+        Rv              5089590000;         // Pa·s/m^3
+        Rvm             0;             // Pa·s/m^3 (0 = off)
+
+        Ca              8.64819e-12;       // m^3/Pa
+        Cim             6.99717e-11 ;       // m^3/Pa
+
+                rho             1060;
+        PimFile         "constant/Pim.dat";   // t[s] Pim[Pa]
+        PimPeriod       1.0;           // s (periodic wrap)
+        PimScaling      1.5;
+
+        diffScheme      BDF1;          // start with first-order
+        useLaggedFlux   true;
+        relaxFactor     0.6;
+        flipFluxSign    false;
+        pimMode transmural;
+        transmuralOnCa false;
+        // Optional warm start:
+        // Po           12000;         // Pa
+        // Pio          2000;          // Pa
+        // Qo           1.0e-8;        // m^3/s
+
+        value           uniform 0.0; // Pa
+    }
+
+    Lc1_sub1
+    {
+        type            coronaryOutletPressure;
+        Ra              25223300000;  Ram 40987900000;  Rv 12611700000;  Rvm 0;
+        Ca              3.49009e-12; Cim 2.8238e-11;
+        PimFile         "constant/Pim.dat";
+        PimPeriod       1.0;
+        PimScaling      1.5;
+        rho             1060;
+        pimMode transmural;
+        transmuralOnCa false;
+        diffScheme      BDF1;    useLaggedFlux true;  relaxFactor 0.6 ;  flipFluxSign false;
+        value           uniform 0.0;
+    }
+
+    Lc1_sub2
+    {
+        type            coronaryOutletPressure;
+        Ra              12910200000;  Ram 20979100000;  Rv 6455110000;  Rvm 0;
+        Ca              6.81875e-12; Cim 5.51699e-11;
+        PimFile         "constant/Pim.dat";
+        PimPeriod       1.0;
+        PimScaling      1.5;
+        rho             1060;
+        pimMode transmural;
+        transmuralOnCa  false;
+        diffScheme      BDF1;    useLaggedFlux true;  relaxFactor 0.6;  flipFluxSign false;
+        value           uniform 0.0;
+    }
+
+    Lc1_sub3
+    {
+        type            coronaryOutletPressure;
+        Ra              20663700000;  Ram 33578500000;  Rv 10331800000;  Rvm 0;
+        Ca              4.26021e-12; Cim 3.44689e-11;
+        PimFile         "constant/Pim.dat";
+        PimPeriod       1.0;
+        PimScaling      1.5;
+        rho             1060;
+        pimMode transmural;
+        transmuralOnCa  false;
+        diffScheme      BDF1;    useLaggedFlux true;  relaxFactor 0.6;  flipFluxSign false;
+        value           uniform 0.0;
+    }
+
+    Lc2
+    {
+        type            coronaryOutletPressure;
+        Ra              7060770000;  Ram 11473800000;  Rv 3530380000;  Rvm 0;
+        Ca              1.24677e-11; Cim 1.0e-10;
+        PimFile         "constant/Pim.dat";
+        PimPeriod       1.0;
+        PimScaling      1.5;
+        rho             1060;
+        pimMode transmural;
+        transmuralOnCa  false;
+        diffScheme      BDF1;    useLaggedFlux true;  relaxFactor 0.6;  flipFluxSign false;
+        value           uniform 0.0;
+    }
+    Lc2_sub1
+    {
+        type            coronaryOutletPressure;
+        Ra              22485300000;  Ram 36538600000;  Rv 11242700000;  Rvm 0;
+        Ca              3.91507e-12; Cim 3.16765e-11;
+        PimFile         "constant/Pim.dat";
+        PimPeriod       1.0;
+        PimScaling      1.5;
+        rho             1060;
+        pimMode transmural;
+        transmuralOnCa  false;
+        diffScheme      BDF1;    useLaggedFlux true;  relaxFactor 0.6;  flipFluxSign false;
+        value           uniform 0.0;
+    }
+
+    Rc1
+    {
+        type            coronaryOutletPressure;
+        Ra              6098370000;  Ram 9909850000;  Rv 11242700000;  Rvm 0;
+        Ca              1.16388e-11; Cim 3.16765e-11;
+        PimFile         "constant/Pim.dat";
+        PimPeriod       1.0;
+        PimScaling      0.5;
+        rho             1060;
+        pimMode transmural;
+        transmuralOnCa  false;
+        diffScheme      BDF1;    useLaggedFlux true;  relaxFactor 0.6;  flipFluxSign false;
+        value           uniform 0.0;
+    }
+
+    Rc1_sub1
+    {
+        type            coronaryOutletPressure;
+        Ra              9720500000;  Ram 15795800000;  Rv 4860250000;  Rvm 0;
+        Ca              7.30184e-12; Cim 5.90786e-11;
+        PimFile         "constant/Pim.dat";
+        PimPeriod       1.0;
+        PimScaling      0.5;
+        rho             1060;
+        pimMode transmural;
+        transmuralOnCa  false;
+        diffScheme      BDF1;    useLaggedFlux true;  relaxFactor 0.6;  flipFluxSign false;
+        value           uniform 0.0;
+    }
+
+    Rc1_sub2
+    {
+        type            coronaryOutletPressure;
+        Ra              8292360000;  Ram 13475100000;  Rv 4146180000;  Rvm 0;
+        Ca              8.55939e-12; Cim 6.92532e-11;
+        PimFile         "constant/Pim.dat";
+        PimPeriod       1.0;
+        rho             1060;
+	pimMode transmural;
+	transmuralOnCa  false;
+        PimScaling      0.5;	
+        diffScheme      BDF1;    useLaggedFlux true;  relaxFactor 0.6;  flipFluxSign false;
+        value           uniform 0.0;
+    }
+}
+
+// ************************************************************************* //
+
+
+

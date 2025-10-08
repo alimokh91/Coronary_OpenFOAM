@@ -1,0 +1,129 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2.3.0                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      surfaceFeatureExtractDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+inlet.stl
+{
+    extractionMethod    extractFromSurface; // extractFromFile or extractFromSurface
+    extractFromSurfaceCoeffs
+    {includedAngle   180;}
+    writeObj                yes;    // Write options
+}
+
+artery.stl
+{
+    extractionMethod    extractFromSurface; // extractFromFile or extractFromSurface
+    extractFromSurfaceCoeffs
+    {includedAngle   180;}
+    writeObj                yes;    // Write options
+}
+
+outlet.stl
+{
+    extractionMethod    extractFromSurface; // extractFromFile or extractFromSurface
+    extractFromSurfaceCoeffs
+    {includedAngle   180;}
+    writeObj                yes;    // Write options
+}
+Lc1.stl
+{
+    extractionMethod    extractFromSurface; // extractFromFile or extractFromSurface
+    extractFromSurfaceCoeffs
+    {
+        includedAngle   180;
+    }
+    writeObj                yes;    // Write options
+}
+
+Lc1_sub1.stl
+{
+    extractionMethod    extractFromSurface; // extractFromFile or extractFromSurface
+    extractFromSurfaceCoeffs
+    {
+        includedAngle   180;
+    }
+    writeObj                yes;    // Write options
+}
+
+Lc1_sub2.stl
+{
+    extractionMethod    extractFromSurface; // extractFromFile or extractFromSurface
+    extractFromSurfaceCoeffs
+    {
+        includedAngle   180;
+    }
+    writeObj                yes;    // Write options
+}
+
+Lc1_sub3.stl
+{
+    extractionMethod    extractFromSurface; // extractFromFile or extractFromSurface
+    extractFromSurfaceCoeffs
+    {
+        includedAngle   180;
+    }
+    writeObj                yes;    // Write options
+}
+
+Lc2.stl
+{
+    extractionMethod    extractFromSurface; // extractFromFile or extractFromSurface
+    extractFromSurfaceCoeffs
+    {
+        includedAngle   180;
+    }
+    writeObj                yes;    // Write options
+}
+
+Lc2_sub1.stl
+{
+    extractionMethod    extractFromSurface; // extractFromFile or extractFromSurface
+    extractFromSurfaceCoeffs
+    {
+        includedAngle   180;
+    }
+    writeObj                yes;    // Write options
+}
+
+Rc1.stl
+{
+    extractionMethod    extractFromSurface; // extractFromFile or extractFromSurface
+    extractFromSurfaceCoeffs
+    {
+        includedAngle   180;
+    }
+    writeObj                yes;    // Write options
+}
+
+Rc1_sub1.stl
+{
+    extractionMethod    extractFromSurface; // extractFromFile or extractFromSurface
+    extractFromSurfaceCoeffs
+    {
+        includedAngle   180;
+    }
+    writeObj                yes;    // Write options
+}
+
+Rc1_sub2.stl
+{
+    extractionMethod    extractFromSurface; // extractFromFile or extractFromSurface
+    extractFromSurfaceCoeffs
+    {
+        includedAngle   180;
+    }
+    writeObj                yes;    // Write options
+}
+
+// ************************************************************************* //
