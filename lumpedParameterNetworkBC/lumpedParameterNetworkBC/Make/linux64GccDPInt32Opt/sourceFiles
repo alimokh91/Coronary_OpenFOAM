@@ -1,6 +1,0 @@
-SOURCE = \
-windkesselOutletPressure/windkesselOutletPressureFvPatchScalarField.C \
-coronaryOutletPressure/coronaryOutletPressureFvPatchScalarField.C \
-stabilizedWindkesselVelocity/stabilizedWindkesselVelocityFvPatchVectorField.C \
-
-# sources
