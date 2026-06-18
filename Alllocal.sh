@@ -28,7 +28,13 @@ do_mesh()
     ( cd lumpedParameterNetworkBC/lumpedParameterNetworkBC && wclean libso && wmake libso ) \
         > log.wmake.lib 2>&1
 
-    echo "==> decomposePar (for parallel snappyHexMesh)"
+    # The 0/ fields reference patches (inlet, outlet, artery, Lc*, Rc*) that only
+    # exist AFTER snappyHexMesh. Move them aside so decomposePar/snappy don't try to
+    # read fields against the bare blockMesh (a/b/c patches), then restore.
+    echo "==> hide 0/ during meshing"
+    rm -rf .0_hold && mv 0 .0_hold
+
+    echo "==> decomposePar (mesh only, for parallel snappyHexMesh)"
     decomposePar $DECDICT -force > log.decomposePar.mesh 2>&1
 
     echo "==> snappyHexMesh -parallel -overwrite on $NP ranks"
@@ -36,6 +42,9 @@ do_mesh()
 
     echo "==> reconstructParMesh"
     reconstructParMesh -constant > log.reconstructParMesh 2>&1
+
+    echo "==> restore 0/"
+    mv .0_hold 0
 
     echo "==> checkMesh"
     checkMesh -constant > log.checkMesh 2>&1 || true
