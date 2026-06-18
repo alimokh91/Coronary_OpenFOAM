@@ -68,6 +68,19 @@ private:
     word     pimMode_{"off"};        // "off" | "backPressure" | "transmural"
     bool     transmuralOnCa_{false}; // also add +Ca*dPim/dt if true
 
+    // If true: the first period [t0, t0+PimPeriod] of the Pim table plays once
+    // (startup ramp), then time loops the SECOND period [t0+PimPeriod, t0+2*PimPeriod]
+    // (the settled cardiac cycle) for all subsequent cycles. Requires the Pim table
+    // to span at least 2*PimPeriod. If false: classic wrap of [t0, t0+PimPeriod].
+    bool     firstCycleRamp_{false};
+
+    // ---- NEW: opt-in backflow pressure penalty (JieWangnk-style, kinematic) ----
+    //     On reversed faces adds  mask*penaltyFactor*0.5*|U|^2  to the LPN pressure
+    bool   backflowStabilization_{false}; // master on/off (default off -> unchanged)
+    scalar penaltyFactor_{1.0};           // scale on the 0.5|U|^2 penalty
+    scalar smoothingWidth_{0.1};          // tanh ramp rel. to mean |phi|; 0 = hard
+    word   UName_{"U"};                   // velocity field name
+
     // ---- Pim lookup table ----
     std::vector<std::pair<scalar, scalar>> PimTable_;  // (t, Pim[Pa])
 

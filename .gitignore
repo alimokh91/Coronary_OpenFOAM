@@ -1,0 +1,25 @@
+# OpenFOAM generated / run-time artifacts (keep code, ignore data)
+
+# Parallel decomposition
+processor*/
+
+# Runtime-compiled code and meshing/build by-products
+dynamicCode/
+lnInclude/
+log
+log.*
+*.log
+
+# Compiled objects / dependency files / arch build dirs
+*.o
+*.so
+*.dep
+**/Make/*/
+
+# Generated mesh
+constant/polyMesh/
+constant/extendedFeatureEdgeMesh/
+
+# Editor / OS noise
+*~
+.DS_Store

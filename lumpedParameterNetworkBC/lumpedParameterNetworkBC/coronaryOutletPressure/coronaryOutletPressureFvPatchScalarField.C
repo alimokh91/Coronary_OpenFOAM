@@ -65,6 +65,13 @@ coronaryOutletPressureFvPatchScalarField
 
     dict.readIfPresent("pimMode", pimMode_);
     dict.readIfPresent("transmuralOnCa", transmuralOnCa_);
+    dict.readIfPresent("firstCycleRamp", firstCycleRamp_);
+
+    // NEW: backflow penalty controls (opt-in)
+    dict.readIfPresent("backflowStabilization", backflowStabilization_);
+    dict.readIfPresent("penaltyFactor", penaltyFactor_);
+    dict.readIfPresent("smoothingWidth", smoothingWidth_);
+    dict.readIfPresent("U", UName_);
 
     haveWarmStart_ = dict.found("Po") || dict.found("Pio") || dict.found("Qo");
     if (haveWarmStart_)
@@ -117,6 +124,11 @@ coronaryOutletPressureFvPatchScalarField
     PimFile_ = rhs.PimFile_; PimPeriod_ = rhs.PimPeriod_;
     PimScaling_ = rhs.PimScaling_; pimMode_ = rhs.pimMode_;
     transmuralOnCa_ = rhs.transmuralOnCa_;
+    firstCycleRamp_ = rhs.firstCycleRamp_;
+    backflowStabilization_ = rhs.backflowStabilization_;
+    penaltyFactor_ = rhs.penaltyFactor_;
+    smoothingWidth_ = rhs.smoothingWidth_;
+    UName_ = rhs.UName_;
     PimTable_ = rhs.PimTable_;
     Pn_ = rhs.Pn_; Pnm1_ = rhs.Pnm1_;
     Pio_ = rhs.Pio_; Pio_m1_ = rhs.Pio_m1_;
@@ -149,6 +161,11 @@ coronaryOutletPressureFvPatchScalarField
     PimFile_ = rhs.PimFile_; PimPeriod_ = rhs.PimPeriod_;
     PimScaling_ = rhs.PimScaling_; pimMode_ = rhs.pimMode_;
     transmuralOnCa_ = rhs.transmuralOnCa_;
+    firstCycleRamp_ = rhs.firstCycleRamp_;
+    backflowStabilization_ = rhs.backflowStabilization_;
+    penaltyFactor_ = rhs.penaltyFactor_;
+    smoothingWidth_ = rhs.smoothingWidth_;
+    UName_ = rhs.UName_;
     PimTable_ = rhs.PimTable_;
     Pn_ = rhs.Pn_; Pnm1_ = rhs.Pnm1_;
     Pio_ = rhs.Pio_; Pio_m1_ = rhs.Pio_m1_;
@@ -256,7 +273,23 @@ scalar coronaryOutletPressureFvPatchScalarField::interpolatePim(const scalar t) 
     if (PimPeriod_ > SMALL)
     {
         const scalar s = max(t - t0, 0.0);
-        teff = t0 + std::fmod(s, PimPeriod_);
+        if (firstCycleRamp_)
+        {
+            // First cycle: play [t0, t0+T] once (startup ramp). Afterwards: loop the
+            // SECOND cycle [t0+T, t0+2T] (settled waveform).
+            if (s < PimPeriod_)
+            {
+                teff = t0 + s;
+            }
+            else
+            {
+                teff = t0 + PimPeriod_ + std::fmod(s - PimPeriod_, PimPeriod_);
+            }
+        }
+        else
+        {
+            teff = t0 + std::fmod(s, PimPeriod_);
+        }
     }
     else
     {
@@ -442,6 +475,33 @@ void coronaryOutletPressureFvPatchScalarField::updateCoeffs()
 	}
     
     scalarField newVals(this->size(), pk);
+
+    // --- Opt-in backflow penalty: on reversed faces add a kinematic dynamic
+    //     pressure  mask*penaltyFactor*0.5*|U|^2  (no rho: field is kinematic).
+    if (backflowStabilization_)
+    {
+        const fvPatchField<vector>& Up =
+            this->db().lookupObject<volVectorField>(UName_).boundaryField()[patchI];
+
+        scalarField mask(this->size(), Zero);
+        if (smoothingWidth_ > SMALL)
+        {
+            const label nF = returnReduce(phip.size(), sumOp<label>());
+            const scalar phiRef = gSum(mag(phip))/max(scalar(nF), scalar(1));
+            const scalar sw = max(smoothingWidth_*phiRef, SMALL);
+            forAll(mask, i) mask[i] = 0.5*(1.0 - Foam::tanh(phip[i]/sw));
+        }
+        else
+        {
+            forAll(mask, i) mask[i] = pos0(-phip[i] - SMALL);
+        }
+
+        forAll(newVals, i)
+        {
+            newVals[i] = pk + mask[i]*penaltyFactor_*0.5*magSqr(Up[i]);
+        }
+    }
+
     if (relaxFactor_ < 1.0 - SMALL)
     {
         newVals = relaxFactor_*newVals + (1.0 - relaxFactor_)*(*this);
@@ -492,6 +552,13 @@ void coronaryOutletPressureFvPatchScalarField::write(Ostream& os) const
 
     os.writeKeyword("pimMode") << pimMode_ << token::END_STATEMENT << nl;
     os.writeKeyword("transmuralOnCa") << transmuralOnCa_ << token::END_STATEMENT << nl;
+    os.writeKeyword("firstCycleRamp") << firstCycleRamp_ << token::END_STATEMENT << nl;
+
+    // NEW: backflow penalty controls
+    os.writeKeyword("backflowStabilization") << backflowStabilization_ << token::END_STATEMENT << nl;
+    os.writeKeyword("penaltyFactor")  << penaltyFactor_  << token::END_STATEMENT << nl;
+    os.writeKeyword("smoothingWidth") << smoothingWidth_ << token::END_STATEMENT << nl;
+    os.writeKeyword("U")              << UName_          << token::END_STATEMENT << nl;
 
     // write back current state (useful for warm restarts)
     os.writeKeyword("Po")  << Pn_  << token::END_STATEMENT << nl;

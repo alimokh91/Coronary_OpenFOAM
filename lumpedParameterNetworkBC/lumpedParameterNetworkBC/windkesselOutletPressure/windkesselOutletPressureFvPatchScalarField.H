@@ -39,6 +39,13 @@ private:
     bool   useLaggedFlux_;   // true: use Qn_ instead of current sub-iter flux in ODE
     bool   flipFluxSign_;    // true: multiply outlet flux by -1 before using it
 
+    // --- NEW: opt-in backflow pressure penalty (JieWangnk-style, kinematic)
+    //     On reversed faces adds  mask*penaltyFactor*0.5*|U|^2  to the WK pressure
+    bool   backflowStabilization_; // master on/off (default false -> unchanged)
+    scalar penaltyFactor_;         // scale on the 0.5|U|^2 penalty (default 1)
+    scalar smoothingWidth_;        // tanh ramp width rel. to mean |phi|; 0 = hard
+    word   UName_;                 // velocity field name (default "U")
+
 public:
 
     // Constructors

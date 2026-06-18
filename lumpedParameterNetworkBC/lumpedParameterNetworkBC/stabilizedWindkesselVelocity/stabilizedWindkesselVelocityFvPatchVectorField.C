@@ -2,80 +2,41 @@
   =========                 |
   \\      /  F ield         |  stabilizedWindkesselVelocity
    \\    /   O peration     |
-    \\  /    A nd           |  Smooth backflow damping for WK outlets
+    \\  /    A nd           |  Directional backflow stabilization for WK outlets
      \\/     M anipulation  |
 -------------------------------------------------------------------------------
+    Ported to OpenFOAM v2506 from JieWangnk/OpenFOAM-WK (v12). License: GPLv3+
 \*---------------------------------------------------------------------------*/
 
 #include "stabilizedWindkesselVelocityFvPatchVectorField.H"
-#include "fvCFD.H"
 #include "addToRunTimeSelectionTable.H"
+#include "volFields.H"
+#include "surfaceFields.H"
 
-namespace Foam
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
+
+Foam::stabilizedWindkesselVelocityFvPatchVectorField::
+stabilizedWindkesselVelocityFvPatchVectorField
+(
+    const fvPatch& p,
+    const DimensionedField<vector, volMesh>& iF
+)
+:
+    directionMixedFvPatchVectorField(p, iF),
+    phiName_("phi"),
+    betaT_(0.2),
+    betaN_(0.0),
+    enableStabilization_(true),
+    dampingFactor_(1.0),
+    smoothingWidth_(0.1)
 {
-
-// * * * * * * * * * * * *  Constructors  * * * * * * * * * * * * * * * * * *
-
-stabilizedWindkesselVelocityFvPatchVectorField::
-stabilizedWindkesselVelocityFvPatchVectorField
-(
-    const fvPatch& p,
-    const DimensionedField<vector, volMesh>& iF
-)
-:
-    zeroGradientFvPatchVectorField(p, iF),
-    kappa_(5.0),
-    Uref_(0.0),
-    linearDamping_(false),
-    alphaMax_(0.8),
-    stateAware_(true),
-    CoRef_(0.5),
-    wkTau_(0.0),
-    tauRef_(0.2)
-{}
+    refValue() = Zero;
+    refGrad() = Zero;
+    valueFraction() = Zero;
+}
 
 
-stabilizedWindkesselVelocityFvPatchVectorField::
-stabilizedWindkesselVelocityFvPatchVectorField
-(
-    const stabilizedWindkesselVelocityFvPatchVectorField& rhs,
-    const fvPatch& p,
-    const DimensionedField<vector, volMesh>& iF,
-    const fvPatchFieldMapper& m
-)
-:
-    zeroGradientFvPatchVectorField(rhs, p, iF, m),
-    kappa_(rhs.kappa_),
-    Uref_(rhs.Uref_),
-    linearDamping_(rhs.linearDamping_),
-    alphaMax_(rhs.alphaMax_),
-    stateAware_(rhs.stateAware_),
-    CoRef_(rhs.CoRef_),
-    wkTau_(rhs.wkTau_),
-    tauRef_(rhs.tauRef_)
-{}
-
-// Clone with new internal field (no mapper)
-stabilizedWindkesselVelocityFvPatchVectorField::
-stabilizedWindkesselVelocityFvPatchVectorField
-(
-    const stabilizedWindkesselVelocityFvPatchVectorField& rhs,
-    const DimensionedField<vector, volMesh>& iF
-)
-:
-    zeroGradientFvPatchVectorField(rhs, iF),
-    kappa_(rhs.kappa_),
-    Uref_(rhs.Uref_),
-    linearDamping_(rhs.linearDamping_),
-    alphaMax_(rhs.alphaMax_),
-    stateAware_(rhs.stateAware_),
-    CoRef_(rhs.CoRef_),
-    wkTau_(rhs.wkTau_),
-    tauRef_(rhs.tauRef_)
-{}
-
-
-stabilizedWindkesselVelocityFvPatchVectorField::
+Foam::stabilizedWindkesselVelocityFvPatchVectorField::
 stabilizedWindkesselVelocityFvPatchVectorField
 (
     const fvPatch& p,
@@ -83,166 +44,201 @@ stabilizedWindkesselVelocityFvPatchVectorField
     const dictionary& dict
 )
 :
-    zeroGradientFvPatchVectorField(p, iF, dict),
-    kappa_(dict.lookupOrDefault<scalar>("kappa", 5.0)),
-    Uref_(dict.lookupOrDefault<scalar>("Uref", 0.0)),
-    linearDamping_(dict.lookupOrDefault<Switch>("linearDamping", false)),
-    alphaMax_(dict.lookupOrDefault<scalar>("alphaMax", 0.8)),
-    stateAware_(dict.lookupOrDefault<Switch>("stateAware", true)),
-    CoRef_(dict.lookupOrDefault<scalar>("CoRef", 0.5)),
-    wkTau_(dict.lookupOrDefault<scalar>("wkTau", 0.0)),
-    tauRef_(dict.lookupOrDefault<scalar>("tauRef", 0.2))
+    directionMixedFvPatchVectorField(p, iF),
+    phiName_(dict.getOrDefault<word>("phi", "phi")),
+    betaT_(dict.getOrDefault<scalar>("betaT", 0.2)),
+    betaN_(dict.getOrDefault<scalar>("betaN", 0.0)),
+    enableStabilization_(dict.getOrDefault<Switch>("enableStabilization", true)),
+    dampingFactor_(dict.getOrDefault<scalar>("dampingFactor", 1.0)),
+    smoothingWidth_(dict.getOrDefault<scalar>("smoothingWidth", 0.1))
+{
+    fvPatchFieldBase::readDict(dict);
+
+    refValue() = Zero;
+    refGrad() = Zero;
+    valueFraction() = Zero;
+
+    if (!this->readValueEntry(dict, IOobjectOption::READ_IF_PRESENT))
+    {
+        // No "value" entry: initialise from the internal cell values
+        fvPatchVectorField::operator=(this->patchInternalField());
+    }
+}
+
+
+Foam::stabilizedWindkesselVelocityFvPatchVectorField::
+stabilizedWindkesselVelocityFvPatchVectorField
+(
+    const stabilizedWindkesselVelocityFvPatchVectorField& ptf,
+    const fvPatch& p,
+    const DimensionedField<vector, volMesh>& iF,
+    const fvPatchFieldMapper& mapper
+)
+:
+    directionMixedFvPatchVectorField(ptf, p, iF, mapper),
+    phiName_(ptf.phiName_),
+    betaT_(ptf.betaT_),
+    betaN_(ptf.betaN_),
+    enableStabilization_(ptf.enableStabilization_),
+    dampingFactor_(ptf.dampingFactor_),
+    smoothingWidth_(ptf.smoothingWidth_)
 {}
 
 
-// * * * * * * * * * * * * * *  Read/Write  * * * * * * * * * * * * * * * * *
-
-void stabilizedWindkesselVelocityFvPatchVectorField::read(const dictionary& dict)
-{
-    // NOTE: do NOT call any base read(dict) here on v2306.
-
-    if (dict.found("kappa"))          { dict.lookup("kappa")          >> kappa_; }
-    if (dict.found("Uref"))           { dict.lookup("Uref")           >> Uref_; }
-    if (dict.found("linearDamping"))  { dict.lookup("linearDamping")  >> linearDamping_; }
-    if (dict.found("alphaMax"))       { dict.lookup("alphaMax")       >> alphaMax_; }
-    if (dict.found("stateAware"))     { dict.lookup("stateAware")     >> stateAware_; }
-    if (dict.found("CoRef"))          { dict.lookup("CoRef")          >> CoRef_; }
-    if (dict.found("wkTau"))          { dict.lookup("wkTau")          >> wkTau_; }
-    if (dict.found("tauRef"))         { dict.lookup("tauRef")         >> tauRef_; }
-}
-
-
-
-void stabilizedWindkesselVelocityFvPatchVectorField::write(Ostream& os) const
-{
-    zeroGradientFvPatchVectorField::write(os);
-    os.writeKeyword("kappa") << kappa_ << token::END_STATEMENT << nl;
-    os.writeKeyword("Uref")  << Uref_  << token::END_STATEMENT << nl;
-    os.writeKeyword("linearDamping") << linearDamping_ << token::END_STATEMENT << nl;
-    os.writeKeyword("alphaMax") << alphaMax_ << token::END_STATEMENT << nl;
-    os.writeKeyword("stateAware") << stateAware_ << token::END_STATEMENT << nl;
-    os.writeKeyword("CoRef") << CoRef_ << token::END_STATEMENT << nl;
-    os.writeKeyword("wkTau") << wkTau_ << token::END_STATEMENT << nl;
-    os.writeKeyword("tauRef") << tauRef_ << token::END_STATEMENT << nl;
-}
-
-
-// * * * * * * * * * * * * * *  Evaluate  * * * * * * * * * * * * * * * * * *
-
-// Helper: smoothstep on [a,b]
-static inline scalar smoothstep(const scalar a, const scalar b, const scalar x)
-{
-    if (x <= a) return 0.0;
-    if (x >= b) return 1.0;
-    const scalar t = (x - a)/(b - a + SMALL);
-    return t*t*(3.0 - 2.0*t);
-}
-
-void stabilizedWindkesselVelocityFvPatchVectorField::evaluate
+Foam::stabilizedWindkesselVelocityFvPatchVectorField::
+stabilizedWindkesselVelocityFvPatchVectorField
 (
-    const Pstream::commsTypes commsType
+    const stabilizedWindkesselVelocityFvPatchVectorField& ptf
+)
+:
+    directionMixedFvPatchVectorField(ptf),
+    phiName_(ptf.phiName_),
+    betaT_(ptf.betaT_),
+    betaN_(ptf.betaN_),
+    enableStabilization_(ptf.enableStabilization_),
+    dampingFactor_(ptf.dampingFactor_),
+    smoothingWidth_(ptf.smoothingWidth_)
+{}
+
+
+Foam::stabilizedWindkesselVelocityFvPatchVectorField::
+stabilizedWindkesselVelocityFvPatchVectorField
+(
+    const stabilizedWindkesselVelocityFvPatchVectorField& ptf,
+    const DimensionedField<vector, volMesh>& iF
+)
+:
+    directionMixedFvPatchVectorField(ptf, iF),
+    phiName_(ptf.phiName_),
+    betaT_(ptf.betaT_),
+    betaN_(ptf.betaN_),
+    enableStabilization_(ptf.enableStabilization_),
+    dampingFactor_(ptf.dampingFactor_),
+    smoothingWidth_(ptf.smoothingWidth_)
+{}
+
+
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+void Foam::stabilizedWindkesselVelocityFvPatchVectorField::autoMap
+(
+    const fvPatchFieldMapper& m
 )
 {
-    // zeroGradient behaviour first
-    zeroGradientFvPatchVectorField::evaluate(commsType);
-
-    const fvPatch& p = patch();
-
-    // Face geometry
-    const vectorField& Sf  = p.Sf();
-    const scalarField  magSf = mag(Sf);
-    vectorField nHat = Sf/(magSf + VSMALL); // outward normals
-
-    // Current patch velocity from the owner cell (zeroGradient base)
-    vectorField v = this->patchInternalField();
-
-    // Estimate Uref if not provided: area-weighted mean *outflow* speed
-    scalar UrefEff = Uref_;
-    if (UrefEff <= SMALL)
-    {
-        scalar num = 0.0, den = 0.0;
-        forAll(v, i)
-        {
-            const scalar vn = (v[i] & nHat[i]);
-            if (vn > 0) { num += vn*magSf[i]; den += magSf[i]; }
-        }
-        UrefEff = (den > VSMALL ? max(num/den, 1e-3) : 0.05); // floor to avoid /0
-    }
-
-    // Optional: state-aware scaling
-    scalar kappaScale = 1.0;
-    if (stateAware_)
-    {
-        // Local Courant per face (approx): |vn| * dt * deltaCoeff
-        const scalar dt = this->db().time().deltaTValue();
-        const scalarField deltaCoeff = p.deltaCoeffs(); // ~ 1/delta
-        scalar CoAvg = 0.0; scalar A = 0.0;
-
-        forAll(v, i)
-        {
-            const scalar vn = mag(v[i] & nHat[i]);
-            const scalar Co = vn * dt * deltaCoeff[i];
-            CoAvg += Co * magSf[i];
-            A += magSf[i];
-        }
-        CoAvg = (A > VSMALL ? CoAvg/A : 0.0);
-
-        const scalar CoScale = min(1.0, (CoRef_ > SMALL ? CoAvg/CoRef_ : 0.0)); // [0,1]
-        // Stronger damping as Co grows: (1 + CoScale) in [1,2]
-        kappaScale *= (1.0 + CoScale);
-
-        // Reduce damping for large WK time-scale (more compliant/longer reversal)
-        if (wkTau_ > SMALL)
-        {
-            const scalar wkScale = 1.0/(1.0 + wkTau_/(tauRef_ + SMALL)); // (0,1]
-            kappaScale *= max(0.1, wkScale); // keep some damping
-        }
-    }
-
-    const scalar kappaEff = max(1e-6, kappa_ * kappaScale);
-
-    // Apply smooth normal-only damping for backflow (vn < 0)
-    forAll(v, i)
-    {
-        const vector vi = v[i];
-        const vector nh = nHat[i];
-
-        const scalar vn = (vi & nh);
-        const vector vt = vi - vn*nh;
-
-        scalar vnNew = vn;
-
-        if (vn < 0.0) // only damp inflow at an outlet
-        {
-            if (linearDamping_)
-            {
-                // alpha rises smoothly from 0 to alphaMax_ as -vn goes 0 -> UrefEff
-                const scalar a = alphaMax_ * smoothstep(0.0, UrefEff, -vn);
-                vnNew = vn * (1.0 - a);
-            }
-            else
-            {
-                // Nonlinear (hyperbolic) damping: vn / (1 + kappaEff*|vn|/UrefEff)
-                const scalar denom = 1.0 + kappaEff * (-vn) / (UrefEff + SMALL);
-                vnNew = vn / denom;
-            }
-        }
-
-        // Recompose velocity (preserve tangential)
-        v[i] = vt + vnNew*nh;
-    }
-
-    // Assign the damped values back to the patch field
-    this->operator==(v);
+    directionMixedFvPatchVectorField::autoMap(m);
 }
 
-} // namespace Foam
+
+void Foam::stabilizedWindkesselVelocityFvPatchVectorField::rmap
+(
+    const fvPatchVectorField& ptf,
+    const labelList& addr
+)
+{
+    directionMixedFvPatchVectorField::rmap(ptf, addr);
+}
+
+
+void Foam::stabilizedWindkesselVelocityFvPatchVectorField::updateCoeffs()
+{
+    if (updated())
+    {
+        return;
+    }
+
+    if (!enableStabilization_)
+    {
+        // Pure zero-gradient (no damping at all)
+        refValue() = Zero;
+        refGrad() = Zero;
+        valueFraction() = Zero;
+
+        directionMixedFvPatchVectorField::updateCoeffs();
+        directionMixedFvPatchVectorField::evaluate();
+        return;
+    }
+
+    // Patch flux (v2506 single-template-arg lookup)
+    const scalarField& phip =
+        patch().lookupPatchField<surfaceScalarField>(phiName_);
+
+    // Backflow mask in [0,1]: 1 where flow re-enters (phi < 0)
+    scalarField mask(patch().size(), Zero);
+    if (smoothingWidth_ > SMALL)
+    {
+        const label nF = returnReduce(phip.size(), sumOp<label>());
+        const scalar phiRef =
+            gSum(mag(phip))/max(scalar(nF), scalar(1));
+        const scalar sw = max(smoothingWidth_*phiRef, SMALL);
+
+        forAll(mask, i)
+        {
+            mask[i] = 0.5*(1.0 - Foam::tanh(phip[i]/sw));
+        }
+    }
+    else
+    {
+        forAll(mask, i)
+        {
+            mask[i] = pos0(-phip[i] - SMALL);
+        }
+    }
+
+    // Directional projection tensors
+    const vectorField n(patch().nf());
+    const symmTensorField normalProj(sqr(n));            // n (x) n
+    const symmTensorField tangProj(symmTensor::I - normalProj);
+
+    const scalar effBetaT = betaT_*dampingFactor_;
+    const scalar effBetaN = betaN_*dampingFactor_;
+
+    refValue() = Zero;   // damped components pulled towards 0
+    refGrad() = Zero;    // free components: zero-gradient
+    valueFraction() = mask*(effBetaN*normalProj + effBetaT*tangProj);
+
+    directionMixedFvPatchVectorField::updateCoeffs();
+    directionMixedFvPatchVectorField::evaluate();
+}
+
+
+void Foam::stabilizedWindkesselVelocityFvPatchVectorField::write
+(
+    Ostream& os
+) const
+{
+    fvPatchField<vector>::write(os);
+    os.writeEntryIfDifferent<word>("phi", "phi", phiName_);
+    os.writeEntry("betaT", betaT_);
+    os.writeEntry("betaN", betaN_);
+    os.writeEntry("enableStabilization", enableStabilization_);
+    os.writeEntry("dampingFactor", dampingFactor_);
+    os.writeEntry("smoothingWidth", smoothingWidth_);
+    fvPatchField<vector>::writeValueEntry(os);
+}
+
+
+// * * * * * * * * * * * * * * * Member Operators  * * * * * * * * * * * * * //
+
+void Foam::stabilizedWindkesselVelocityFvPatchVectorField::operator=
+(
+    const fvPatchField<vector>& pvf
+)
+{
+    tmp<vectorField> normalValue = transform(valueFraction(), refValue());
+    tmp<vectorField> transformGradValue = transform(I - valueFraction(), pvf);
+    fvPatchField<vector>::operator=(normalValue + transformGradValue);
+}
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-#include "addToRunTimeSelectionTable.H"
 namespace Foam
 {
-    makePatchTypeField(fvPatchVectorField, stabilizedWindkesselVelocityFvPatchVectorField);
+    makePatchTypeField
+    (
+        fvPatchVectorField,
+        stabilizedWindkesselVelocityFvPatchVectorField
+    );
 }
 
+// ************************************************************************* //
