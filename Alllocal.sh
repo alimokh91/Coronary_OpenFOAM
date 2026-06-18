@@ -38,7 +38,7 @@ do_mesh()
     decomposePar $DECDICT -force > log.decomposePar.mesh 2>&1
 
     echo "==> snappyHexMesh -parallel -overwrite on $NP ranks"
-    mpirun -np $NP snappyHexMesh $DECDICT -parallel -overwrite > log.snappyHexMesh 2>&1
+    mpirun --oversubscribe -np $NP snappyHexMesh $DECDICT -parallel -overwrite > log.snappyHexMesh 2>&1
 
     echo "==> reconstructParMesh"
     reconstructParMesh -constant > log.reconstructParMesh 2>&1
@@ -59,7 +59,7 @@ do_solve()
     decomposePar $DECDICT -force > log.decomposePar 2>&1
 
     echo "==> pimpleFoam -parallel on $NP ranks"
-    mpirun -np $NP pimpleFoam $DECDICT -parallel | tee log.pimpleFoam
+    mpirun --oversubscribe -np $NP pimpleFoam $DECDICT -parallel | tee log.pimpleFoam
 }
 
 case "$STAGE" in
