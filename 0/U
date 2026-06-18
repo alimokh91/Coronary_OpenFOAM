@@ -156,31 +156,27 @@ boundaryField
         forAll(U, i) { U[i] = -scale * uiShape[i] * nMean; }
     #};
     }
-        outlet
+    outlet
     {
-    type            stabilizedWindkesselVelocity;
-kappa           8;          // 5–8 is a sweet spot
-Uref            0;
-linearDamping   false;      // keep nonlinear at the aorta
-alphaMax        0.8;        // fine here
-stateAware      true;
-CoRef           0.5;
-wkTau           0.71;          // or 0.05–0.10 s if desired
-tauRef          0.2;
-
-    
+        type                stabilizedWindkesselVelocity;
+        phi                 phi;
+        betaT               0.2;        // damp tangential backflow vortices
+        betaN               0.0;        // leave normal free for WK coupling
+        smoothingWidth      0.1;        // smooth tanh ramp (0 = hard switch)
+        enableStabilization true;
+        value               uniform (0 0 0);
     }
-    
-    // --- Coronary outlets: allow reversal (no velocity clamp) ---
-Lc1         { type pressureInletOutletVelocity; value uniform (0 0 0); }
-Lc1_sub1    { type pressureInletOutletVelocity; value uniform (0 0 0); }
-Lc1_sub2    { type pressureInletOutletVelocity; value uniform (0 0 0); }
-Lc1_sub3    { type pressureInletOutletVelocity; value uniform (0 0 0); }
-Lc2         { type pressureInletOutletVelocity; value uniform (0 0 0); }
-Lc2_sub1    { type pressureInletOutletVelocity; value uniform (0 0 0); }
-Rc1         { type pressureInletOutletVelocity; value uniform (0 0 0); }
-Rc1_sub1    { type pressureInletOutletVelocity; value uniform (0 0 0); }
-Rc1_sub2    { type pressureInletOutletVelocity; value uniform (0 0 0); }
+
+    // --- Coronary outlets: directional backflow stabilization ---
+    Lc1      { type stabilizedWindkesselVelocity; phi phi; betaT 0.2; betaN 0.0; smoothingWidth 0.1; enableStabilization true; value uniform (0 0 0); }
+    Lc1_sub1 { type stabilizedWindkesselVelocity; phi phi; betaT 0.2; betaN 0.0; smoothingWidth 0.1; enableStabilization true; value uniform (0 0 0); }
+    Lc1_sub2 { type stabilizedWindkesselVelocity; phi phi; betaT 0.2; betaN 0.0; smoothingWidth 0.1; enableStabilization true; value uniform (0 0 0); }
+    Lc1_sub3 { type stabilizedWindkesselVelocity; phi phi; betaT 0.2; betaN 0.0; smoothingWidth 0.1; enableStabilization true; value uniform (0 0 0); }
+    Lc2      { type stabilizedWindkesselVelocity; phi phi; betaT 0.2; betaN 0.0; smoothingWidth 0.1; enableStabilization true; value uniform (0 0 0); }
+    Lc2_sub1 { type stabilizedWindkesselVelocity; phi phi; betaT 0.2; betaN 0.0; smoothingWidth 0.1; enableStabilization true; value uniform (0 0 0); }
+    Rc1      { type stabilizedWindkesselVelocity; phi phi; betaT 0.2; betaN 0.0; smoothingWidth 0.1; enableStabilization true; value uniform (0 0 0); }
+    Rc1_sub1 { type stabilizedWindkesselVelocity; phi phi; betaT 0.2; betaN 0.0; smoothingWidth 0.1; enableStabilization true; value uniform (0 0 0); }
+    Rc1_sub2 { type stabilizedWindkesselVelocity; phi phi; betaT 0.2; betaN 0.0; smoothingWidth 0.1; enableStabilization true; value uniform (0 0 0); }
 
 }
 

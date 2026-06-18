@@ -23,7 +23,11 @@ windkesselOutletPressureFvPatchScalarField
     lastDt_(-1),
     relaxFactor_(0.5),
     useLaggedFlux_(true),
-    flipFluxSign_(false)
+    flipFluxSign_(false),
+    backflowStabilization_(false),
+    penaltyFactor_(1.0),
+    smoothingWidth_(0.1),
+    UName_("U")
 {}
 
 
@@ -54,7 +58,11 @@ windkesselOutletPressureFvPatchScalarField
     lastDt_(-1),
     relaxFactor_(dict.lookupOrDefault<scalar>("relaxFactor", 0.5)),
     useLaggedFlux_(dict.lookupOrDefault<bool>("useLaggedFlux", true)),
-    flipFluxSign_(dict.lookupOrDefault<bool>("flipFluxSign", false))
+    flipFluxSign_(dict.lookupOrDefault<bool>("flipFluxSign", false)),
+    backflowStabilization_(dict.lookupOrDefault<bool>("backflowStabilization", false)),
+    penaltyFactor_(dict.lookupOrDefault<scalar>("penaltyFactor", 1.0)),
+    smoothingWidth_(dict.lookupOrDefault<scalar>("smoothingWidth", 0.1)),
+    UName_(dict.lookupOrDefault<word>("U", "U"))
 {
     // Windkessel model
     word WKModelStr = dict.lookupOrDefault<word>("windkesselModel", "WK3");
@@ -107,7 +115,11 @@ windkesselOutletPressureFvPatchScalarField
     lastDt_(ptf.lastDt_),
     relaxFactor_(ptf.relaxFactor_),
     useLaggedFlux_(ptf.useLaggedFlux_),
-    flipFluxSign_(ptf.flipFluxSign_)
+    flipFluxSign_(ptf.flipFluxSign_),
+    backflowStabilization_(ptf.backflowStabilization_),
+    penaltyFactor_(ptf.penaltyFactor_),
+    smoothingWidth_(ptf.smoothingWidth_),
+    UName_(ptf.UName_)
 {}
 
 
@@ -129,7 +141,11 @@ windkesselOutletPressureFvPatchScalarField
     lastDt_(wkpsf.lastDt_),
     relaxFactor_(wkpsf.relaxFactor_),
     useLaggedFlux_(wkpsf.useLaggedFlux_),
-    flipFluxSign_(wkpsf.flipFluxSign_)
+    flipFluxSign_(wkpsf.flipFluxSign_),
+    backflowStabilization_(wkpsf.backflowStabilization_),
+    penaltyFactor_(wkpsf.penaltyFactor_),
+    smoothingWidth_(wkpsf.smoothingWidth_),
+    UName_(wkpsf.UName_)
 {}
 
 // * * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * //
@@ -322,15 +338,45 @@ void Foam::windkesselOutletPressureFvPatchScalarField::updateCoeffs()
     // --- Under-relaxed write-back as kinematic pressure (m^2/s^2)
     const scalar pk = PnAbs / (rho_ + SMALL);
 
+    // Base target: uniform Windkessel pressure on all faces
+    scalarField target(patch().size(), pk);
+
+    // --- Opt-in backflow penalty: on reversed faces add a kinematic dynamic
+    //     pressure  mask*penaltyFactor*0.5*|U|^2  (no rho: field is kinematic).
+    if (backflowStabilization_)
+    {
+        const fvPatchField<vector>& Up =
+            db().lookupObject<volVectorField>(UName_).boundaryField()[patchI];
+
+        const scalarField& phip = phi.boundaryField()[patchI];
+
+        scalarField mask(patch().size(), Zero);
+        if (smoothingWidth_ > SMALL)
+        {
+            const label nF = returnReduce(phip.size(), sumOp<label>());
+            const scalar phiRef = gSum(mag(phip))/max(scalar(nF), scalar(1));
+            const scalar sw = max(smoothingWidth_*phiRef, SMALL);
+            forAll(mask, i) mask[i] = 0.5*(1.0 - Foam::tanh(phip[i]/sw));
+        }
+        else
+        {
+            forAll(mask, i) mask[i] = pos0(-phip[i] - SMALL);
+        }
+
+        forAll(target, i)
+        {
+            target[i] = pk + mask[i]*penaltyFactor_*0.5*magSqr(Up[i]);
+        }
+    }
+
     if (relaxFactor_ > 0 && relaxFactor_ < 1)
     {
-        scalarField target(patch().size(), pk);
         // mix with current boundary values (*this) for damping
         operator==( relaxFactor_*target + (1.0 - relaxFactor_)*(*this) );
     }
     else
     {
-        operator==( pk );
+        operator==( target );
     }
 
     lastDt_ = dt;
@@ -390,6 +436,12 @@ void Foam::windkesselOutletPressureFvPatchScalarField::write(Ostream& os) const
     os.writeKeyword("relaxFactor")   << relaxFactor_   << token::END_STATEMENT << nl;
     os.writeKeyword("useLaggedFlux") << (useLaggedFlux_ ? "true" : "false") << token::END_STATEMENT << nl;
     os.writeKeyword("flipFluxSign")  << (flipFluxSign_  ? "true" : "false") << token::END_STATEMENT << nl;
+
+    // NEW: backflow penalty controls
+    os.writeKeyword("backflowStabilization") << (backflowStabilization_ ? "true" : "false") << token::END_STATEMENT << nl;
+    os.writeKeyword("penaltyFactor")  << penaltyFactor_  << token::END_STATEMENT << nl;
+    os.writeKeyword("smoothingWidth") << smoothingWidth_ << token::END_STATEMENT << nl;
+    os.writeKeyword("U")              << UName_          << token::END_STATEMENT << nl;
 
     os.writeKeyword("Qooo") << Qooo_ << token::END_STATEMENT << nl;
     os.writeKeyword("Qoo")  << Qoo_  << token::END_STATEMENT << nl;

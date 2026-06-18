@@ -68,6 +68,13 @@ private:
     word     pimMode_{"off"};        // "off" | "backPressure" | "transmural"
     bool     transmuralOnCa_{false}; // also add +Ca*dPim/dt if true
 
+    // ---- NEW: opt-in backflow pressure penalty (JieWangnk-style, kinematic) ----
+    //     On reversed faces adds  mask*penaltyFactor*0.5*|U|^2  to the LPN pressure
+    bool   backflowStabilization_{false}; // master on/off (default off -> unchanged)
+    scalar penaltyFactor_{1.0};           // scale on the 0.5|U|^2 penalty
+    scalar smoothingWidth_{0.1};          // tanh ramp rel. to mean |phi|; 0 = hard
+    word   UName_{"U"};                   // velocity field name
+
     // ---- Pim lookup table ----
     std::vector<std::pair<scalar, scalar>> PimTable_;  // (t, Pim[Pa])
 

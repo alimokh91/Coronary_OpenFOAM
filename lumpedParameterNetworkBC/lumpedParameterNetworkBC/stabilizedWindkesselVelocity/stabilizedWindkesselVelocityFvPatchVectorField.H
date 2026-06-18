@@ -2,115 +2,159 @@
   =========                 |
   \\      /  F ield         |  stabilizedWindkesselVelocity
    \\    /   O peration     |
-    \\  /    A nd           |  Smooth backflow damping for WK outlets
+    \\  /    A nd           |  Directional backflow stabilization for WK outlets
      \\/     M anipulation  |
 -------------------------------------------------------------------------------
-    Author: Ali + ChatGPT
+Description
+    Directional backflow-stabilized velocity boundary condition for Windkessel /
+    lumped-parameter pressure outlets.
+
+    Ported to OpenFOAM v2506 (ESI) from JieWangnk/OpenFOAM-WK (OpenFOAM v12).
+    Derives from directionMixedFvPatchVectorField so the stabilization enters the
+    implicit PIMPLE matrix. On flow reversal (phi < 0) the TANGENTIAL velocity
+    component is damped towards zero (suppressing reentrant vortices) while the
+    NORMAL component is left free (zero-gradient) so the Windkessel pressure can
+    still drive the outflow. During outflow it reduces to a plain zero-gradient.
+
+    valueFraction = mask(phi) * ( betaN*(n n) + betaT*(I - n n) )
+    refValue      = 0
+    refGrad       = 0
+
+    where mask(phi) is a smooth tanh ramp (smoothingWidth > 0) or a hard
+    Heaviside switch (smoothingWidth = 0) on the patch flux.
+
     License: GPLv3+
 \*---------------------------------------------------------------------------*/
 
 #ifndef stabilizedWindkesselVelocityFvPatchVectorField_H
 #define stabilizedWindkesselVelocityFvPatchVectorField_H
 
-#include "zeroGradientFvPatchFields.H"
-#include "vectorField.H"
+#include "fvPatchFields.H"
+#include "directionMixedFvPatchFields.H"
 #include "Switch.H"
 
 namespace Foam
 {
 
+/*---------------------------------------------------------------------------*\
+        Class stabilizedWindkesselVelocityFvPatchVectorField Declaration
+\*---------------------------------------------------------------------------*/
+
 class stabilizedWindkesselVelocityFvPatchVectorField
 :
-    public zeroGradientFvPatchVectorField
+    public directionMixedFvPatchVectorField
 {
-    // === user parameters (read from dictionary) ===
-    scalar kappa_;          // nonlinearity strength (2..10 recommended)
-    scalar Uref_;           // reference speed [m/s]; if <= 0, estimate per step
-    Switch  linearDamping_; // if true: use smoothstep linear scaling
-    scalar  alphaMax_;      // max linear damping (<=0.9), used only if linearDamping_=true
+    // Private data
 
-    // --- state-aware (optional) ---
-    Switch  stateAware_;    // enable state-aware scaling
-    scalar  CoRef_;         // reference Courant (~0.5)
-    scalar  wkTau_;         // Windkessel time-scale [s] (e.g. Rd*C); 0 => disabled
-    scalar  tauRef_;        // reference time-scale for scaling [s], e.g. 0.2
+        //- Flux field name
+        word phiName_;
+
+        //- Tangential backflow damping (0-1)
+        scalar betaT_;
+
+        //- Normal backflow damping (0-1); keep 0 to leave WK coupling free
+        scalar betaN_;
+
+        //- Master on/off switch
+        Switch enableStabilization_;
+
+        //- Overall multiplier on the damping
+        scalar dampingFactor_;
+
+        //- Smooth tanh ramp width (relative to mean |phi|); 0 = hard switch
+        scalar smoothingWidth_;
+
 
 public:
 
     //- Runtime type information
     TypeName("stabilizedWindkesselVelocity");
 
+
     // Constructors
-    stabilizedWindkesselVelocityFvPatchVectorField
-    (
-        const fvPatch&,
-        const DimensionedField<vector, volMesh>&
-    );
 
-    stabilizedWindkesselVelocityFvPatchVectorField
-    (
-        const stabilizedWindkesselVelocityFvPatchVectorField&,
-        const fvPatch&,
-        const DimensionedField<vector, volMesh>&,
-        const fvPatchFieldMapper&
-    );
-
-    // Clone with new internal field (no mapper needed)
-    stabilizedWindkesselVelocityFvPatchVectorField
-    (
-        const stabilizedWindkesselVelocityFvPatchVectorField&,
-        const DimensionedField<vector, volMesh>&
-    );
-
-    stabilizedWindkesselVelocityFvPatchVectorField
-    (
-        const fvPatch&,
-        const DimensionedField<vector, volMesh>&,
-        const dictionary&
-    );
-
-    //- Clone
-    virtual tmp<fvPatchVectorField> clone() const
-    {
-        return tmp<fvPatchVectorField>
+        //- Construct from patch and internal field
+        stabilizedWindkesselVelocityFvPatchVectorField
         (
-            new stabilizedWindkesselVelocityFvPatchVectorField(*this)
+            const fvPatch&,
+            const DimensionedField<vector, volMesh>&
         );
-    }
 
-    //- Clone with new internal field reference
-    virtual tmp<fvPatchVectorField> clone
-    (
-        const DimensionedField<vector, volMesh>& iF
-    ) const
-    {
-        return tmp<fvPatchVectorField>
+        //- Construct from patch, internal field and dictionary
+        stabilizedWindkesselVelocityFvPatchVectorField
         (
-            new stabilizedWindkesselVelocityFvPatchVectorField(*this, iF)
+            const fvPatch&,
+            const DimensionedField<vector, volMesh>&,
+            const dictionary&
         );
-    }
 
-    //- Mapping
-    virtual void autoMap(const fvPatchFieldMapper& m)
-    {
-        zeroGradientFvPatchVectorField::autoMap(m);
-    }
-    virtual void rmap(const fvPatchVectorField& ptf, const labelList& addr)
-    {
-        zeroGradientFvPatchVectorField::rmap(ptf, addr);
-    }
+        //- Construct by mapping onto a new patch
+        stabilizedWindkesselVelocityFvPatchVectorField
+        (
+            const stabilizedWindkesselVelocityFvPatchVectorField&,
+            const fvPatch&,
+            const DimensionedField<vector, volMesh>&,
+            const fvPatchFieldMapper&
+        );
 
-    //- Read dictionary
-    virtual void read(const dictionary&);
+        //- Construct as copy
+        stabilizedWindkesselVelocityFvPatchVectorField
+        (
+            const stabilizedWindkesselVelocityFvPatchVectorField&
+        );
 
-    //- Evaluate (apply damping to the patch velocity)
-    virtual void evaluate(const Pstream::commsTypes commsType=Pstream::commsTypes::blocking);
+        //- Construct as copy setting internal field reference
+        stabilizedWindkesselVelocityFvPatchVectorField
+        (
+            const stabilizedWindkesselVelocityFvPatchVectorField&,
+            const DimensionedField<vector, volMesh>&
+        );
 
-    //- Write
-    virtual void write(Ostream&) const;
+        //- Return a clone
+        virtual tmp<fvPatchField<vector>> clone() const
+        {
+            return fvPatchField<vector>::Clone(*this);
+        }
+
+        //- Clone with an internal field reference
+        virtual tmp<fvPatchField<vector>> clone
+        (
+            const DimensionedField<vector, volMesh>& iF
+        ) const
+        {
+            return fvPatchField<vector>::Clone(*this, iF);
+        }
+
+
+    // Member Functions
+
+        //- True: this patch field is altered by assignment.
+        virtual bool assignable() const { return true; }
+
+        // Mapping functions
+
+            virtual void autoMap(const fvPatchFieldMapper&);
+
+            virtual void rmap
+            (
+                const fvPatchVectorField&,
+                const labelList&
+            );
+
+        //- Update the coefficients associated with the patch field
+        virtual void updateCoeffs();
+
+        //- Write
+        virtual void write(Ostream&) const;
+
+
+    // Member operators
+
+        virtual void operator=(const fvPatchField<vector>& pvf);
 };
 
-} // namespace Foam
+} // End namespace Foam
 
 #endif
 
+// ************************************************************************* //
