@@ -65,6 +65,7 @@ coronaryOutletPressureFvPatchScalarField
 
     dict.readIfPresent("pimMode", pimMode_);
     dict.readIfPresent("transmuralOnCa", transmuralOnCa_);
+    dict.readIfPresent("firstCycleRamp", firstCycleRamp_);
 
     // NEW: backflow penalty controls (opt-in)
     dict.readIfPresent("backflowStabilization", backflowStabilization_);
@@ -123,6 +124,7 @@ coronaryOutletPressureFvPatchScalarField
     PimFile_ = rhs.PimFile_; PimPeriod_ = rhs.PimPeriod_;
     PimScaling_ = rhs.PimScaling_; pimMode_ = rhs.pimMode_;
     transmuralOnCa_ = rhs.transmuralOnCa_;
+    firstCycleRamp_ = rhs.firstCycleRamp_;
     backflowStabilization_ = rhs.backflowStabilization_;
     penaltyFactor_ = rhs.penaltyFactor_;
     smoothingWidth_ = rhs.smoothingWidth_;
@@ -159,6 +161,7 @@ coronaryOutletPressureFvPatchScalarField
     PimFile_ = rhs.PimFile_; PimPeriod_ = rhs.PimPeriod_;
     PimScaling_ = rhs.PimScaling_; pimMode_ = rhs.pimMode_;
     transmuralOnCa_ = rhs.transmuralOnCa_;
+    firstCycleRamp_ = rhs.firstCycleRamp_;
     backflowStabilization_ = rhs.backflowStabilization_;
     penaltyFactor_ = rhs.penaltyFactor_;
     smoothingWidth_ = rhs.smoothingWidth_;
@@ -270,7 +273,23 @@ scalar coronaryOutletPressureFvPatchScalarField::interpolatePim(const scalar t) 
     if (PimPeriod_ > SMALL)
     {
         const scalar s = max(t - t0, 0.0);
-        teff = t0 + std::fmod(s, PimPeriod_);
+        if (firstCycleRamp_)
+        {
+            // First cycle: play [t0, t0+T] once (startup ramp). Afterwards: loop the
+            // SECOND cycle [t0+T, t0+2T] (settled waveform).
+            if (s < PimPeriod_)
+            {
+                teff = t0 + s;
+            }
+            else
+            {
+                teff = t0 + PimPeriod_ + std::fmod(s - PimPeriod_, PimPeriod_);
+            }
+        }
+        else
+        {
+            teff = t0 + std::fmod(s, PimPeriod_);
+        }
     }
     else
     {
@@ -533,6 +552,7 @@ void coronaryOutletPressureFvPatchScalarField::write(Ostream& os) const
 
     os.writeKeyword("pimMode") << pimMode_ << token::END_STATEMENT << nl;
     os.writeKeyword("transmuralOnCa") << transmuralOnCa_ << token::END_STATEMENT << nl;
+    os.writeKeyword("firstCycleRamp") << firstCycleRamp_ << token::END_STATEMENT << nl;
 
     // NEW: backflow penalty controls
     os.writeKeyword("backflowStabilization") << backflowStabilization_ << token::END_STATEMENT << nl;
