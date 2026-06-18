@@ -1,82 +1,111 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
-|  \\    /   O peration     | Version:  5                                     |
-|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|  \\    /   O peration     | Version:  2506                                  |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
 |    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 FoamFile
 {
-    version     2.0;
-    format      ascii;
-    class       dictionary;
-    object      fvSolution;
+    version         2;
+    format          ascii;
+    class           dictionary;
+    object          fvSolution;
 }
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 solvers
 {
     p
     {
         solver          GAMG;
-        tolerance       1e-7;
+        tolerance       1e-07;
         relTol          0.05;
-        smoother                DICGaussSeidel;
-        // Reasonable GAMG defaults
-        cacheAgglomeration      true;
-        nCellsInCoarsestLevel   10;
-        agglomerator            faceAreaPair;
-        mergeLevels             1;    	
+        smoother        DICGaussSeidel;
+        cacheAgglomeration true;
+        nCellsInCoarsestLevel 10;
+        agglomerator    faceAreaPair;
+        mergeLevels     1;
     }
-
     pFinal
     {
-        $p;
-        tolerance        1e-9;
-        relTol           0;
+        solver          GAMG;
+        tolerance       1e-09;
+        relTol          0;
+        smoother        DICGaussSeidel;
+        cacheAgglomeration true;
+        nCellsInCoarsestLevel 10;
+        agglomerator    faceAreaPair;
+        mergeLevels     1;
     }
-
     "(U|k|omega)"
     {
         solver          smoothSolver;
         smoother        symGaussSeidel;
-        tolerance       1e-8;
+        tolerance       1e-08;
         relTol          0.1;
     }
-
     "(U|k|omega)Final"
     {
-        $U;
+        solver          smoothSolver;
+        smoother        symGaussSeidel;
         tolerance       1e-10;
         relTol          0;
     }
     Phi
     {
-        $p;
+        solver          GAMG;
+        tolerance       1e-07;
+        relTol          0.05;
+        smoother        DICGaussSeidel;
+        cacheAgglomeration true;
+        nCellsInCoarsestLevel 10;
+        agglomerator    faceAreaPair;
+        mergeLevels     1;
     }
-
 }
+
 potentialFlow
 {
-    // Used for potentialFoam initialisation
     nNonOrthogonalCorrectors 0;
 }
 
 PIMPLE
 {
-    nOuterCorrectors 3;
+    nOuterCorrectors 40;
     nCorrectors     2;
     nNonOrthogonalCorrectors 1;
-    momentumPredictor        yes;
+    momentumPredictor yes;
     pRefCell        0;
     pRefValue       0;
+    residualControl
+    {
+        p
+        {
+            tolerance       0.0001;
+            relTol          0;
+        }
+        U
+        {
+            tolerance       0.0001;
+            relTol          0;
+        }
+    }
 }
 
 relaxationFactors
 {
-    // Transient PIMPLE: prefer NO relaxation (let outer loops do the work)
-    fields    { }
-    equations { }
+    fields
+    {
+        p               0.3;
+        pFinal          1;
+    }
+    equations
+    {
+        U               0.7;
+        UFinal          1;
+    }
 }
+
 
 // ************************************************************************* //

@@ -39,7 +39,7 @@ boundaryField
         Rp              1.3997e+07;
         C               1e-08;
         diffScheme      firstOrder;
-        relaxFactor     0.5;
+        relaxFactor     1;
         useLaggedFlux   true;
         flipFluxSign    false;
         value           uniform 0;
@@ -63,7 +63,7 @@ boundaryField
         PimScaling      1.5;
         diffScheme      BDF1;
         useLaggedFlux   true;
-        relaxFactor     0.6;
+        relaxFactor     1;
         flipFluxSign    false;
         pimMode         transmural;
         transmuralOnCa  false;
@@ -91,7 +91,7 @@ boundaryField
         transmuralOnCa  false;
         diffScheme      BDF1;
         useLaggedFlux   true;
-        relaxFactor     0.6;
+        relaxFactor     1;
         flipFluxSign    false;
         value           uniform 0;
         backflowStabilization true;
@@ -117,7 +117,7 @@ boundaryField
         transmuralOnCa  false;
         diffScheme      BDF1;
         useLaggedFlux   true;
-        relaxFactor     0.6;
+        relaxFactor     1;
         flipFluxSign    false;
         value           uniform 0;
         backflowStabilization true;
@@ -143,7 +143,7 @@ boundaryField
         transmuralOnCa  false;
         diffScheme      BDF1;
         useLaggedFlux   true;
-        relaxFactor     0.6;
+        relaxFactor     1;
         flipFluxSign    false;
         value           uniform 0;
         backflowStabilization true;
@@ -169,7 +169,7 @@ boundaryField
         transmuralOnCa  false;
         diffScheme      BDF1;
         useLaggedFlux   true;
-        relaxFactor     0.6;
+        relaxFactor     1;
         flipFluxSign    false;
         value           uniform 0;
         backflowStabilization true;
@@ -195,7 +195,7 @@ boundaryField
         transmuralOnCa  false;
         diffScheme      BDF1;
         useLaggedFlux   true;
-        relaxFactor     0.6;
+        relaxFactor     1;
         flipFluxSign    false;
         value           uniform 0;
         backflowStabilization true;
@@ -221,7 +221,7 @@ boundaryField
         transmuralOnCa  false;
         diffScheme      BDF1;
         useLaggedFlux   true;
-        relaxFactor     0.6;
+        relaxFactor     1;
         flipFluxSign    false;
         value           uniform 0;
         backflowStabilization true;
@@ -247,7 +247,7 @@ boundaryField
         transmuralOnCa  false;
         diffScheme      BDF1;
         useLaggedFlux   true;
-        relaxFactor     0.6;
+        relaxFactor     1;
         flipFluxSign    false;
         value           uniform 0;
         backflowStabilization true;
@@ -273,7 +273,7 @@ boundaryField
         PimScaling      0.5;
         diffScheme      BDF1;
         useLaggedFlux   true;
-        relaxFactor     0.6;
+        relaxFactor     1;
         flipFluxSign    false;
         value           uniform 0;
         backflowStabilization true;
